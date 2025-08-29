@@ -3,7 +3,7 @@ from pages import branch_employee, headquarters_employee
 
 # 페이지 설정
 st.set_page_config(
-    page_title="신한은행 스테이블코인 인텔리전스",
+    page_title="신한금융그룹 스테이블코인 인텔리전스",
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -11,7 +11,7 @@ st.set_page_config(
 
 # 메인 페이지
 def main():
-    st.title("🏦 신한은행 스테이블코인 인텔리전스")
+    st.title("🏦 신한금융그룹 스테이블코인 인텔리전스")
     st.markdown("---")
     
     # 사이드바에 페이지 선택 옵션 제공

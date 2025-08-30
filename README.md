@@ -38,9 +38,26 @@ pip install -r requirements.txt
 `.env` 파일을 생성하고 다음 API 키들을 설정하세요:
 
 ```env
+# 필수: OpenAI API 키
 OPENAI_API_KEY=your_openai_api_key_here
+
+# 선택: Tavily Search API 키 (뉴스 검색용)
 TAVILY_API_KEY=your_tavily_api_key_here
+
+# 선택: Google Custom Search API (용어 백과사전 인터넷 검색 보완용)
+SEARCH_API_KEY=your_google_search_api_key_here
+SEARCH_ENGINE_ID=your_custom_search_engine_id_here
 ```
+
+#### Google Custom Search API 설정 방법 (선택사항)
+
+용어 백과사전에서 백과사전에 없는 내용을 인터넷 검색으로 보완하려면:
+
+1. **API 키 발급**: [Google Cloud Console](https://console.cloud.google.com/)에서 Custom Search API 활성화
+2. **검색 엔진 생성**: [Google Custom Search Engine](https://cse.google.com/)에서 검색 엔진 생성
+3. **환경 변수 설정**: 위에서 발급받은 키들을 `.env` 파일에 입력
+
+API 키가 설정되지 않은 경우, 백과사전에 없는 내용에 대해서는 시뮬레이션된 검색 결과를 제공합니다.
 
 ### 3. 애플리케이션 실행
 
@@ -63,10 +80,11 @@ shinhan-stable-coin-intelligence/
 │   └── headquarters_employee.py    # 본부부서 직원 페이지
 └── utils/                          # 유틸리티 모듈
     ├── __init__.py
-    ├── dictionary.py               # 용어 백과사전 RAG
+    ├── dictionary.py               # 용어 백과사전 RAG (stablecoin_book_2025_full.md 기반)
     ├── simple_news_analysis.py     # 뉴스 분석
     ├── regulation_analysis.py      # 규제 분석
-    └── business_case_analysis.py   # 비즈니스 분석
+    ├── business_case_analysis.py   # 비즈니스 분석
+    └── stablecoin_book_2025_full.md # 스테이블코인 용어 백과사전 마크다운
 ```
 
 ## 🔧 기술 스택
@@ -75,7 +93,8 @@ shinhan-stable-coin-intelligence/
 - **AI/ML**: LangChain, LangGraph
 - **LLM**: OpenAI GPT-3.5-turbo
 - **Vector Database**: FAISS
-- **Search**: Tavily Search API
+- **Search**: Tavily Search API, Google Custom Search API (선택사항)
+- **Knowledge Base**: Markdown 기반 RAG 시스템
 - **Language**: Python 3.8+
 
 ## 📚 사용법
@@ -84,6 +103,9 @@ shinhan-stable-coin-intelligence/
 
 1. 사이드바에서 "🏪 영업점 직원" 선택
 2. **용어 백과사전** 탭에서 스테이블코인 관련 용어 검색
+   - `stablecoin_book_2025_full.md` 기반의 포괄적인 용어 데이터베이스
+   - 백과사전에 없는 내용은 자동으로 인터넷 검색으로 보완
+   - 유사한 용어 자동 추천 기능
 3. **뉴스 & QA** 탭에서 최신 뉴스 기반 질의응답
 
 ### 본부부서 직원

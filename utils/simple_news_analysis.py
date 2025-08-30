@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Dict, Any
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import FAISS
@@ -7,9 +8,58 @@ from langchain.schema import Document
 from langchain.chains import RetrievalQA
 from tavily import TavilyClient
 from dotenv import load_dotenv
+from collections import Counter
 
 # 환경 변수 로드
 load_dotenv()
+
+# 자주 묻는 질문 캐시 파일 경로
+FAQ_CACHE_FILE = "faq_cache.json"
+
+def load_faq_cache() -> Counter:
+    """FAQ 캐시 파일에서 질문 카운트 로드"""
+    try:
+        if os.path.exists(FAQ_CACHE_FILE):
+            with open(FAQ_CACHE_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return Counter(data.get('counts', {}))
+    except Exception:
+        pass
+    return Counter()
+
+def save_faq_cache(question_counts: Counter):
+    """FAQ 캐시 파일에 질문 카운트 저장"""
+    try:
+        data = {'counts': dict(question_counts)}
+        with open(FAQ_CACHE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def record_question(question: str):
+    """질문을 기록하고 카운트 증가"""
+    if question.strip():
+        question_counts = load_faq_cache()
+        question_counts[question.strip()] += 1
+        save_faq_cache(question_counts)
+
+def get_top_questions(top_k: int = 3) -> List[Dict[str, Any]]:
+    """가장 많이 묻는 질문 상위 k개 반환"""
+    try:
+        question_counts = load_faq_cache()
+        top_questions = question_counts.most_common(top_k)
+        
+        result = []
+        for question, count in top_questions:
+            if question.strip():  # 빈 질문 제외
+                result.append({
+                    'question': question,
+                    'count': count
+                })
+        
+        return result
+    except Exception:
+        return []
 
 class StablecoinNewsAnalysis:
     """
@@ -29,6 +79,9 @@ class StablecoinNewsAnalysis:
     def get_answer(self, question: str) -> str:
         """사용자 질문에 대한 뉴스 기반 답변 생성"""
         try:
+            # 질문 기록
+            record_question(question)
+            
             # 스테이블코인 관련 검색어 생성
             search_query = f"스테이블코인 {question}"
             

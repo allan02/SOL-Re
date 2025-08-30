@@ -17,8 +17,15 @@ except ImportError:
         from langgraph import StateGraph, END
 from typing import TypedDict, List, Dict, Any, Annotated
 from langchain_core.messages import HumanMessage, SystemMessage
-from fpdf import FPDF
+
 import io
+
+# .env 파일 로드
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 excel_path = os.path.join(os.path.dirname(__file__), 'stablecoin_financial_institutions_with_roles_kor_renamed.xlsx')
 
@@ -458,7 +465,7 @@ def show_business_case_analysis():
     # LangGraph 구성
     def create_analysis_graph():
         """분석을 위한 LangGraph 생성"""
-        workflow = StateGraph()
+        workflow = StateGraph(AnalysisState)
         
         # 노드 추가
         workflow.add_node("fetch_news", fetch_news_node)
@@ -490,127 +497,6 @@ def show_business_case_analysis():
                 st.write(details)
             else:
                 st.write("처리 중...")
-
-    def generate_pdf_report(company_name, news_items, grouped_items, group_analyses, issue_scores):
-        """PDF 보고서 생성 함수"""
-        pdf = FPDF()
-        pdf.add_page()
-        
-        # 한글 폰트 설정
-        try:
-            pdf.add_font('NanumGothic', '', '/System/Library/Fonts/Supplemental/AppleSDGothicNeo.ttc', uni=True)
-            font_name = 'NanumGothic'
-        except:
-            try:
-                pdf.add_font('NanumGothic', '', '/Library/Fonts/NanumGothic.ttf', uni=True)
-                font_name = 'NanumGothic'
-            except:
-                try:
-                    pdf.add_font('NanumGothic', '', '/System/Library/Fonts/AppleSDGothicNeo.ttc', uni=True)
-                    font_name = 'NanumGothic'
-                except:
-                    font_name = 'Arial'
-        
-        # 제목
-        pdf.set_font(font_name, '', 18)
-        pdf.cell(0, 20, f"{company_name} 스테이블코인 시장 분석 보고서", ln=True, align='C')
-        pdf.ln(10)
-        
-        # 생성 일시
-        pdf.set_font(font_name, '', 10)
-        pdf.cell(0, 10, f"생성 일시: {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')}", ln=True)
-        pdf.ln(10)
-        
-        # 요약 정보
-        pdf.set_font(font_name, '', 14)
-        pdf.cell(0, 12, "📊 분석 요약", ln=True)
-        pdf.set_font(font_name, '', 10)
-        pdf.cell(0, 10, f"• 총 검색된 뉴스 기사: {len(news_items)}건", ln=True)
-        pdf.cell(0, 10, f"• 주요 이슈 그룹: {len(grouped_items)}개", ln=True)
-        pdf.cell(0, 10, f"• 분석 대상 회사: {company_name}", ln=True)
-        pdf.ln(10)
-        
-        # Top 3 이슈 상세 분석
-        pdf.set_font(font_name, '', 14)
-        pdf.cell(0, 12, "🔍 주요 이슈 상세 분석", ln=True)
-        pdf.ln(8)
-        
-        top_3_labels = list(grouped_items.keys())[:3]
-        for i, label in enumerate(top_3_labels, 1):
-            items_in_group = grouped_items[label]
-            importance_score = issue_scores.get(label, 0)
-            
-            # 이슈 제목
-            pdf.set_font(font_name, '', 12)
-            pdf.cell(0, 10, f"{i}. {label}", ln=True)
-            pdf.set_font(font_name, '', 8)
-            pdf.cell(0, 10, f"중요도 점수: {importance_score}/100", ln=True)
-            pdf.ln(4)
-            
-            # 분석 결과
-            analysis_text = group_analyses.get(label, "분석을 생성할 수 없습니다.")
-            pdf.set_font(font_name, '', 10)
-            pdf.cell(0, 8, "📋 분석 결과:", ln=True)
-            pdf.set_font(font_name, '', 10)
-            pdf.multi_cell(0, 8, analysis_text)
-            pdf.ln(4)
-            
-            # 관련 기사
-            pdf.set_font(font_name, '', 10)
-            pdf.cell(0, 8, "📰 관련 기사:", ln=True)
-            for item in items_in_group:
-                title = item.get('title', '')
-                description = item.get('description', '')
-                pub_date = item.get('pubDate', '')
-                
-                if title:
-                    pdf.set_font(font_name, '', 10)
-                    pdf.cell(0, 6, f"• {title}", ln=True)
-                if description:
-                    pdf.multi_cell(0, 6, f"  {description}")
-                if pub_date:
-                    try:
-                        dt = parsedate_to_datetime(pub_date)
-                        formatted_date = dt.strftime('%Y-%m-%d %H:%M')
-                    except Exception:
-                        formatted_date = pub_date
-                    pdf.set_font(font_name, '', 8)
-                    pdf.cell(0, 6, f"  📅 {formatted_date}", ln=True)
-                pdf.ln(2)
-            
-            if i < len(top_3_labels):
-                pdf.ln(8)
-        
-        # 전체 뉴스 목록
-        pdf.add_page()
-        pdf.set_font(font_name, '', 14)
-        pdf.cell(0, 12, "📋 전체 뉴스 기사 목록", ln=True)
-        pdf.ln(8)
-        
-        for i, item in enumerate(news_items, 1):
-            title = item.get('title', '')
-            description = item.get('description', '')
-            pub_date = item.get('pubDate', '')
-            
-            pdf.set_font(font_name, '', 10)
-            pdf.cell(0, 8, f"{i}. {title}", ln=True)
-            if description:
-                pdf.multi_cell(0, 8, f"   {description}")
-            if pub_date:
-                try:
-                    dt = parsedate_to_datetime(pub_date)
-                    formatted_date = dt.strftime('%Y-%m-%d %H:%M')
-                except Exception:
-                    formatted_date = pub_date
-                pdf.set_font(font_name, '', 8)
-                pdf.cell(0, 6, f"   📅 {formatted_date}", ln=True)
-            pdf.ln(4)
-        
-        # PDF 생성
-        buffer = io.BytesIO()
-        pdf.output(buffer)
-        buffer.seek(0)
-        return buffer.getvalue()
 
     # 선택된 회사명 기준 역할별 검색 및 병합
     try:
@@ -684,17 +570,6 @@ def show_business_case_analysis():
                 issue_scores = final_state["issue_scores"]
 
                 st.success(f"검색 결과 {len(merged_items)}건 (최근 1개월 내)")
-                
-                # PDF 다운로드 버튼 추가
-                if merged_items:
-                    pdf_data = generate_pdf_report(selected_company, merged_items, grouped, group_analyses, issue_scores)
-                    st.download_button(
-                        label="📄 분석 결과 PDF 다운로드",
-                        data=pdf_data,
-                        file_name=f"{selected_company}_스테이블코인_분석보고서_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True
-                    )
                 
                 st.markdown("---")
                 

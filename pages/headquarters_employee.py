@@ -121,22 +121,4 @@ def show_headquarters_employee_page():
     with tab2:
         st.header("🏛️ 메이저 금융사 현황 분석")
         st.markdown("주요 금융사의 스테이블코인 전략과 잠재적 리스크를 분석합니다.")
-        
-        # 사용자 입력
-        user_question = st.text_input(
-            "비즈니스 분석 질문을 입력하세요:",
-            placeholder="예: JP모건의 스테이블코인 전략은?",
-            key="business_question"
-        )
-        
-        if st.button("🔍 비즈니스 분석", key="business_search"):
-            if user_question:
-                with st.spinner("비즈니스 정보를 분석하고 있습니다..."):
-                    try:
-                        answer = business_case_analysis.get_business_analysis(user_question)
-                        st.success("분석 결과:")
-                        st.write(answer)
-                    except Exception as e:
-                        st.error(f"오류가 발생했습니다: {str(e)}")
-            else:
-                st.warning("질문을 입력해주세요.")
+        business_case_analysis.show_business_case_analysis()

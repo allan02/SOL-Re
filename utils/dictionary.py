@@ -9,6 +9,7 @@ from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 from langchain.chains import RetrievalQA
+from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 
 # 환경 변수 로드
@@ -210,12 +211,27 @@ class StablecoinDictionary:
         print("🔍 FAISS 벡터 데이터베이스 생성 중...")
         self.vector_store = FAISS.from_documents(splits, self.embeddings)
         
-        # QA 체인 생성 (더 많은 관련 문서 검색)
+        # QA 체인 생성 (새로운 방식 사용)
+        retriever = self.vector_store.as_retriever(search_kwargs={"k": 8})
+        
+        # 프롬프트 템플릿 정의
+        prompt_template = """
+        다음은 스테이블코인 용어 백과사전에 대한 질문입니다.
+        질문: {question}
+        
+        제공된 정보를 바탕으로 정확하고 이해하기 쉬운 답변을 제공해주세요.
+        답변은 한국어로 작성하고, 필요시 예시를 포함해주세요.
+        
+        컨텍스트: {context}
+        """
+        
+        # 새로운 체인 생성
         self.qa_chain = RetrievalQA.from_chain_type(
             llm=self.llm,
             chain_type="stuff",
-            retriever=self.vector_store.as_retriever(search_kwargs={"k": 8}),  # 더 많은 문서 검색
-            return_source_documents=True
+            retriever=retriever,
+            return_source_documents=True,
+            chain_type_kwargs={"prompt": PromptTemplate.from_template(prompt_template)}
         )
         
         print("✅ 스테이블코인 용어 백과사전 지식베이스 초기화 완료!")

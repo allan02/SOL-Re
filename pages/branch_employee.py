@@ -6,13 +6,13 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'utils'))
 
 # dictionary 모듈 import
-from dictionary import get_dictionary_answer, get_similar_terms, search_terms_by_category, get_all_categories
+import dictionary
 # simple_news_analysis 모듈 import
-from simple_news_analysis import get_news_answer, get_top_questions
+import simple_news_analysis
 
 # 페이지 설정
 st.set_page_config(
-    page_title="영업점 직원 - 신한금융그룹 스테이블코인 인텔리전스",
+    page_title="SSCI (영업점용)",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -72,7 +72,8 @@ def branch_employee_main():
         menu_options = {
             "": "서비스를 선택하세요",
             "menu1": "🔍 용어 검색",
-            "menu2": "❓ Quick FAQ"
+            "menu2": "❓ Quick FAQ",
+            "home": "🏠 홈으로 돌아가기",
         }
         
         selected_menu = st.selectbox(
@@ -83,11 +84,36 @@ def branch_employee_main():
         )
         
         if selected_menu:
-            st.session_state.menu_selected = selected_menu
+            if selected_menu == "home":
+                # 홈으로 돌아가기
+                st.switch_page("app.py")
+            else:
+                st.session_state.menu_selected = selected_menu
         else:
             # 빈 값이 선택되면 솔 캐릭터 화면으로 되돌아감
             st.session_state.menu_selected = None
-            st.success(f"현재 위치: 서비스 홈")
+        
+        # 자주 묻는 질문을 사이드바에 표시
+        if st.session_state.menu_selected == "menu2":
+            st.caption("아래 자주 묻는 질문을 클릭하면 검색창에 자동으로 입력되고 검색이 실행됩니다.")
+            top_questions = simple_news_analysis.get_top_questions(3)
+            
+            if top_questions:
+                for i, q_data in enumerate(top_questions):
+                    # 질문을 클릭하면 검색창에 자동 설정하고 검색까지 실행
+                    if st.button(
+                        f"Q{i+1}: {q_data['question'][:25]}{'...' if len(q_data['question']) > 25 else ''}",
+                        key=f"faq_qa_btn_{i}",
+                        help=f"(총 {q_data['count']}회 질문됨)",
+                        use_container_width=True
+                    ):
+                        # 세션 상태에 질문 저장하여 검색창에 자동 설정하고 자동 검색 실행
+                        st.session_state.auto_fill_qa_question = q_data['question']
+                        st.session_state.auto_execute_search = True
+                        st.rerun()
+            else:
+                st.info("아직 자주 묻는 질문이 없습니다.")
+                st.caption("질문을 해보세요!")
         
         # 솔 페이지 이미지 추가
         st.image("images/sol_page.png", use_container_width="always")
@@ -103,51 +129,74 @@ def branch_employee_main():
             st.markdown("스테이블코인과 관련된 용어를 검색하고 자세한 설명을 확인할 수 있습니다.")
             
             # 검색 입력
-            search_query = st.text_input("검색할 용어를 입력하세요:", placeholder="예: USDT, 블록체인...")
+            search_query = st.text_input("용어:", placeholder="예: 스테이블 코인, USDT...")
             
-            if search_query:
-                if st.button("검색", type="primary"):
-                    with st.spinner("검색 중..."):
-                        # dictionary.py의 get_dictionary_answer 함수 사용
-                        answer = get_dictionary_answer(search_query)
-                        st.markdown("### 검색 결과")
-                        st.write(answer)
+            if st.button("검색", type="secondary", use_container_width=True):
+                if search_query:
+                    # KB 포함 여부를 먼저 판단하여 사용자에게 즉시 안내 표시
+                    with st.spinner("내부 지식 데이터 확인 중입니다..."):
+                        try:
+                            in_kb = dictionary.is_question_in_kb(search_query)
+                        except Exception:
+                            in_kb = True  # 문제가 생기면 기본적으로 KB 경로로 처리
+                    
+                    if in_kb:
+                        st.success("내부 지식 데이터를 찾았습니다.")
+                    if not in_kb:
+                        st.warning("내부 지식 데이터가 없습니다. 인터넷 검색을 시작하겠습니다.")
                         
-                        # 유사한 용어도 함께 표시
-                        similar_terms = get_similar_terms(search_query, top_k=3)
-                        if similar_terms:
-                            st.markdown("### 관련 용어")
-                            for term_data in similar_terms:
-                                with st.expander(f"{term_data['term']}"):
-                                    st.write(term_data['content'])
+                    with st.spinner("답변을 생성하고 있습니다..."):
+                        try:
+                            answer = dictionary.get_dictionary_answer(search_query)
+                            st.write(answer)
+                        except Exception as e:
+                            st.error(f"오류가 발생했습니다: {str(e)}")
+                else:
+                    st.warning("질문을 입력해주세요.")
         
         elif st.session_state.menu_selected == "menu2":
             # Quick FAQ 인터페이스
             st.markdown("## Quick FAQ")
             st.markdown("스테이블코인과 관련된 질문을 하고 최신 뉴스를 바탕으로 답변을 받을 수 있습니다.")
             
-            # 자주 묻는 질문 표시
-            top_questions = get_top_questions(top_k=3)
-            if top_questions:
-                st.markdown("### 자주 묻는 질문")
-                for q_data in top_questions:
-                    if st.button(f"Q: {q_data['question']} (조회수: {q_data['count']})", key=f"faq_{q_data['question']}"):
-                        with st.spinner("답변 생성 중..."):
-                            answer = get_news_answer(q_data['question'])
-                            st.markdown("### 답변")
+            # 기존 기능 그대로 유지
+            user_question = st.text_input(
+                "질문:",
+                placeholder="예: 최근 스테이블코인 도입 은행에 대해 알려주세요.",
+                value=st.session_state.get("auto_fill_qa_question", ""),
+                key="news_question"
+            )
+            
+            if st.button("검색", key="news_search", use_container_width=True):
+                if user_question:
+                    with st.spinner("다양한 뉴스를 참고하여 답변을 생성하고 있습니다..."):
+                        try:
+                            answer = simple_news_analysis.get_news_answer(user_question)
                             st.write(answer)
+                        except Exception as e:
+                            st.error(f"오류가 발생했습니다: {str(e)}")
+                else:
+                    st.warning("질문을 입력해주세요.")
             
-            # 새로운 질문 입력
-            st.markdown("### 새로운 질문하기")
-            faq_query = st.text_input("질문을 입력하세요:", placeholder="예: 스테이블코인 규제 현황은?")
-            
-            if faq_query:
-                if st.button("질문하기", type="primary"):
-                    with st.spinner("답변 생성 중..."):
-                        # simple_news_analysis.py의 get_news_answer 함수 사용
-                        answer = get_news_answer(faq_query)
-                        st.markdown("### 답변")
+            # 자동 검색 답변을 검색창 아래에 표시
+            if st.session_state.get("auto_execute_search", False) and st.session_state.get("auto_fill_qa_question"):
+                # 자동 검색 실행
+                auto_question = st.session_state.auto_fill_qa_question
+                with st.spinner("다양한 뉴스를 참고하여 답변을 생성하고 있습니다..."):
+                    try:
+                        answer = simple_news_analysis.get_news_answer(auto_question)
+                        st.success("답변:")
                         st.write(answer)
+                    except Exception as e:
+                        st.error(f"오류가 발생했습니다: {str(e)}")
+                
+                # 자동 검색 상태 초기화
+                del st.session_state.auto_execute_search
+            
+            # 자동 채워진 질문 초기화 - 검색 후에도 내용이 유지되도록 수정
+            # 사용자가 직접 입력을 지우거나 새로운 질문을 입력할 때만 초기화
+            if "auto_fill_qa_question" in st.session_state and not user_question and not st.session_state.get("news_question", ""):
+                del st.session_state.auto_fill_qa_question
         else:
             # 기본 이미지 표시
             col_left, col_center, col_right = st.columns([1, 2, 1])
@@ -159,14 +208,14 @@ def branch_employee_main():
                     st.markdown("""
                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 250px;">
                         <div style="text-align: center;">
-                            <p>1. 왼쪽 사이드바에서 원하는 메뉴를 선택하세요<br>2. 각 메뉴는 영업점 업무에 필요한 기능을 제공합니다<br>3. 용어 검색, Quick FAQ를 활용하세요</p>
+                            <p>1. 왼쪽 사이드바에서 원하는 서비스를 선택하세요<br>2. 각 메뉴는 영업점 업무에 필요한 기능을 제공합니다<br>3. 용어 검색, Quick FAQ를 활용하세요</p>
                         </div>
                     </div>
                     """.format(""), unsafe_allow_html=True)
 
     # 브랜드 푸터
     st.markdown('<div class="brand-footer">', unsafe_allow_html=True)
-    st.markdown('<p>© 2024 SHINHAN FINANCIAL GROUP. All Rights Reserved.</p>', unsafe_allow_html=True)
+    st.markdown('<p>© 2025 SHINHAN FINANCIAL GROUP. All Rights Reserved.</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":

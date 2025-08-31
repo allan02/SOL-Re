@@ -1,7 +1,7 @@
 import os
 import json
 import urllib.request
-import urllib.parse
+import streamlit as st
 import time
 from typing import List, Dict, Any
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
@@ -417,13 +417,14 @@ class StablecoinDictionary:
                 
                 인터넷 검색 결과: {internet_result}
                 
-                위 정보를 종합하여 사실 기반으로 명확하고 간결하게 답변하세요.
+                위 정보를 종합하여 사실 기반으로 명확하게 답변하세요.
                 답변은 한국어로 작성하고, 사과나 '정보가 없습니다'와 같은 표현은 사용하지 마세요.
                 필요한 경우 핵심 출처 링크를 함께 제시하세요.
+                답변만 출력하세요.
                 """
                 enhanced_result = self.qa_chain({"query": enhanced_prompt})
                 response_time = time.time() - start_time
-                print(f"🌐 인터넷 검색 기반 답변 완료 (응답시간: {response_time:.2f}초)")
+                st.info(f"인터넷 검색 기반 답변 완료 (응답시간: {response_time:.2f}초)")
                 return enhanced_result['result']
             
             # 프롬프트 템플릿 (KB에 있는 경우)
@@ -434,6 +435,7 @@ class StablecoinDictionary:
             제공된 정보를 바탕으로 정확하고 이해하기 쉬운 답변을 제공해주세요.
             답변은 한국어로 작성하고, 필요시 예시를 포함해주세요.
             이 질문은 백과사전에 포함된 내용이므로 상세하고 정확한 답변을 제공해주세요.
+            답변만 출력하세요.
             """
             
             # QA 체인 실행
@@ -443,7 +445,7 @@ class StablecoinDictionary:
             # 지식베이스에서 충분한 정보를 얻었는지 확인
             if self._check_knowledge_coverage(question, answer):
                 response_time = time.time() - start_time
-                print(f"💾 DB 답변 완료 (응답시간: {response_time:.2f}초)")
+                st.info(f"내부 지식 데이터 기반 답변 완료 (응답시간: {response_time:.2f}초)")
                 return answer
             else:
                 # 인터넷 검색으로 보완
@@ -454,13 +456,14 @@ class StablecoinDictionary:
                 
                 인터넷 검색 결과: {internet_result}
                 
-                위 정보를 종합하여 사실 기반으로 명확하고 간결하게 답변하세요.
+                위 정보를 종합하여 사실 기반으로 명확하게 답변하세요.
                 답변은 한국어로 작성하고, 사과나 '정보가 없습니다'와 같은 표현은 사용하지 마세요.
                 필요한 경우 핵심 출처 링크를 함께 제시하세요.
+                답변만 출력하세요.
                 """
                 enhanced_result = self.qa_chain({"query": enhanced_prompt})
                 response_time = time.time() - start_time
-                print(f"🌐 인터넷 검색 보완 답변 완료 (응답시간: {response_time:.2f}초)")
+                st.info(f"인터넷 검색 보완 답변 완료 (응답시간: {response_time:.2f}초)")
                 return enhanced_result["result"]
             
         except Exception as e:

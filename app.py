@@ -169,7 +169,7 @@ def main():
     
     # 브랜드 푸터
     st.markdown('<div class="brand-footer">', unsafe_allow_html=True)
-    st.markdown('<p>© 2024 SHINHAN FINANCIAL GROUP. All Rights Reserved.</p>', unsafe_allow_html=True)
+    st.markdown('<p>© 2025 SHINHAN FINANCIAL GROUP. All Rights Reserved.</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     
     # main-content div 닫기

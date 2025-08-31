@@ -1,16 +1,8 @@
-"""
-신한 스테이블코인 인텔리전스 - 규제 분석 모듈
-
-이 모듈은 다음 파이프라인을 제공합니다:
-1. Tavily 웹검색 → 2. 국가별 규제 정규화 → 3. 리스크/대응 예측 → 4. Q&A(재질답)
-"""
-
 import os
 import json
-import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
-from datetime import datetime
+import streamlit as st
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -27,16 +19,6 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
-
-try:
-    import streamlit as st
-    STREAMLIT_AVAILABLE = True
-except ImportError:
-    STREAMLIT_AVAILABLE = False
-
-# 로깅 설정
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 @dataclass
 class SearchItem:
@@ -78,15 +60,11 @@ class WebSearch:
             try:
                 self.client = TavilyClient(api_key=self.api_key)
             except Exception as e:
-                logger.warning(f"Tavily 클라이언트 초기화 실패: {e}")
+                pass
     
     def search(self, query: str, country: Optional[str] = None, max_results: int = 8) -> List[SearchItem]:
         """웹 검색 수행"""
-        if not query or not query.strip():
-            return []
-        
-        if not self.client:
-            logger.warning("Tavily API 키가 설정되지 않았습니다.")
+        if not query or not query.strip() or not self.client:
             return []
         
         try:
@@ -113,7 +91,6 @@ class WebSearch:
             return results
             
         except Exception as e:
-            logger.error(f"웹 검색 실패: {e}")
             return []
 
 class RegulationAnalyzer:
@@ -129,11 +106,7 @@ class RegulationAnalyzer:
     
     def analyze(self, results: List[SearchItem]) -> List[CountryRegulation]:
         """검색 결과를 분석하여 규제 정보 추출"""
-        if not results:
-            return []
-        
-        if not self.client:
-            logger.warning("OpenAI API 키가 설정되지 않았습니다.")
+        if not results or not self.client:
             return []
         
         try:
@@ -234,21 +207,18 @@ class RegulationAnalyzer:
             
             # 응답 내용 검증
             if not content:
-                logger.warning("OpenAI API가 빈 응답을 반환했습니다.")
                 return []
             
             # JSON 형식 검증 및 정리
             try:
                 # 응답에서 JSON 부분만 추출 (```json ... ``` 형태일 수 있음)
                 if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
+                    content = content.split("```json")[1].split("```")[1].strip()
                 elif "```" in content:
                     content = content.split("```")[1].strip()
                 
                 regulations = json.loads(content)
             except json.JSONDecodeError as e:
-                logger.error(f"JSON 파싱 실패: {e}")
-                logger.error(f"응답 내용: {content[:200]}...")  # 응답 내용 로깅
                 return []
             
             # 데이터 검증 및 변환
@@ -268,10 +238,8 @@ class RegulationAnalyzer:
             return validated_regulations
             
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 파싱 실패: {e}")
             return []
         except Exception as e:
-            logger.error(f"규제 분석 실패: {e}")
             return []
 
 class RiskPredictor:
@@ -291,7 +259,6 @@ class RiskPredictor:
             return []
         
         if not self.client:
-            logger.warning("OpenAI API 키가 설정되지 않았습니다.")
             return []
         
         try:
@@ -368,21 +335,18 @@ class RiskPredictor:
             
             # 응답 내용 검증
             if not content:
-                logger.warning("OpenAI API가 빈 응답을 반환했습니다.")
                 return []
             
             # JSON 형식 검증 및 정리
             try:
                 # 응답에서 JSON 부분만 추출 (```json ... ``` 형태일 수 있음)
                 if "```json" in content:
-                    content = content.split("```json")[1].split("```")[0].strip()
+                    content = content.split("```json")[1].split("```")[1].strip()
                 elif "```" in content:
                     content = content.split("```")[1].strip()
                 
                 risks = json.loads(content)
             except json.JSONDecodeError as e:
-                logger.error(f"JSON 파싱 실패: {e}")
-                logger.error(f"응답 내용: {content[:200]}...")  # 응답 내용 로깅
                 return []
             
             # 데이터 검증 및 변환
@@ -406,10 +370,8 @@ class RiskPredictor:
             return validated_risks
             
         except json.JSONDecodeError as e:
-            logger.error(f"JSON 파싱 실패: {e}")
             return []
         except Exception as e:
-            logger.error(f"리스크 예측 실패: {e}")
             return []
 
 class QAAgent:
@@ -556,7 +518,6 @@ class QAAgent:
             return answer
             
         except Exception as e:
-            logger.error(f"Q&A 처리 실패: {e}")
             return "질문 처리 중 오류가 발생했습니다."
 
 def run_pipeline(query: str, country: Optional[str] = None, scenario_hint: Optional[str] = None, model: str = "gpt-4o-mini") -> Dict[str, Any]:
@@ -594,7 +555,6 @@ def run_pipeline(query: str, country: Optional[str] = None, scenario_hint: Optio
         }
         
     except Exception as e:
-        logger.error(f"파이프라인 실행 실패: {e}")
         return {
             "search_results": [],
             "risks": [],
@@ -817,7 +777,6 @@ def get_regulation_analysis(question: str) -> str:
         return summary
         
     except Exception as e:
-        logger.error(f"규제 분석 실패: {e}")
         return f"""# ❌ 규제 분석 오류
 
 ### 🚨 오류 내용
@@ -834,16 +793,6 @@ def get_regulation_analysis(question: str) -> str:
 • 국가명을 포함한 검색어 사용 (예: "미국 스테이블코인 규제")
 • 구체적인 규제명 사용 (예: "MiCA 규제")
 • 최신 날짜 포함 (예: "2024년 스테이블코인 정책")"""
-
-
-
-
-
-
-
-
-
-
 
 def get_country_regulation_comparison(selected_countries: List[str]) -> str:
     """선택된 국가들의 스테이블코인 규제를 웹검색하여 비교 분석합니다.
@@ -963,7 +912,6 @@ def get_country_regulation_comparison(selected_countries: List[str]) -> str:
                             all_regulations.append(regulation_data)
                             
                         except json.JSONDecodeError as e:
-                            logger.warning(f"{country} 규제 정보 JSON 파싱 실패: {e}")
                             # 기본 정보로 대체
                             all_regulations.append({
                                 "country": country,
@@ -978,7 +926,6 @@ def get_country_regulation_comparison(selected_countries: List[str]) -> str:
                             })
                         
                 except Exception as e:
-                    logger.warning(f"{country} OpenAI API 호출 실패: {e}")
                     # 기본 정보로 대체
                     all_regulations.append({
                         "country": country,
@@ -1001,7 +948,6 @@ def get_country_regulation_comparison(selected_countries: List[str]) -> str:
         return comparison_result
         
     except Exception as e:
-        logger.error(f"국가별 규제 비교 분석 중 오류 발생: {e}")
         return f"국가별 규제 비교 분석 중 오류가 발생했습니다: {str(e)}"
 
 
@@ -1222,160 +1168,125 @@ def _generate_regulation_comparison_table(regulations: List[Dict]) -> str:
     
     return comparison_result
 
-# 데모 UI (__main__ 실행 시)
-if __name__ == "__main__":
-    if not STREAMLIT_AVAILABLE:
-        print("Streamlit이 설치되지 않았습니다. 'pip install streamlit'으로 설치하세요.")
-        exit(1)
+
+def show_country_regulation_analysis():
+    """국가별 스테이블코인 규제 분석 UI를 표시합니다."""
     
-    st.set_page_config(
-        page_title="규제 분석 데모",
-        page_icon="📊",
-        layout="wide"
+    # Streamlit 세션 상태 초기화
+    if "regulation_chat_history" not in st.session_state:
+        st.session_state.regulation_chat_history = []
+    
+    if "regulation_processing" not in st.session_state:
+        st.session_state.regulation_processing = False
+    
+    if "regulation_last_prompt" not in st.session_state:
+        st.session_state.regulation_last_prompt = ""
+    
+    if "analysis_started" not in st.session_state:
+        st.session_state.analysis_started = False
+    
+    # 주요 국가 리스트
+    major_countries = [
+        "United States", "European Union", "United Kingdom", "Japan", "South Korea", 
+        "China", "Singapore", "Switzerland", "Canada", "Australia", "Brazil", "India"
+    ]
+    
+    # 국가 선택
+    selected_countries = st.multiselect(
+        "국가:",
+        options=major_countries,
+        default=["United States", "European Union", "Japan"],
+        max_selections=3,
+        help="최대 3개 국가까지 선택 가능합니다. 주요 금융 중심지 국가들을 선택하면 더 유용한 비교 분석을 얻을 수 있습니다."
     )
     
-    st.title("신한 스테이블코인 인텔리전스 - 규제 분석 데모")
-    
-    # 사이드바 설정
-    with st.sidebar:
-        st.header("설정")
-        query = st.text_input("검색 쿼리", value="stablecoin regulation")
-        country = st.text_input("국가 (선택사항)", placeholder="예: South Korea, EU, US")
-        scenario_hint = st.text_area("시나리오 힌트 (선택사항)", placeholder="특정 비즈니스 상황이나 고려사항")
-        model = st.selectbox("AI 모델", ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo"])
-        
-        if st.button("분석 실행"):
-            if query.strip():
-                with st.spinner("분석 중..."):
-                    result = run_pipeline(query, country, scenario_hint, model)
-                    st.session_state.analysis_result = result
-            else:
-                st.error("검색 쿼리를 입력하세요.")
-    
-    # 메인 영역
-    if "analysis_result" in st.session_state:
-        result = st.session_state.analysis_result
-        
-        # 검색 결과
-        st.header("�� 검색 결과")
-        if result["search_results"]:
-            for i, item in enumerate(result["search_results"]):
-                with st.expander(f"{i+1}. {item.title}"):
-                    st.write(f"**URL:** {item.url}")
-                    st.write(f"**내용:** {item.snippet}")
+    # 분석 실행 버튼
+    if st.button("비교분석 실행", key="country_comparison", type="secondary", use_container_width=True):
+        if len(selected_countries) < 2:
+            st.error("최소 2개 국가를 선택해주세요.")
+        elif len(selected_countries) > 3:
+            st.error("최대 3개 국가까지만 선택 가능합니다.")
         else:
-            st.info("검색 결과가 없습니다.")
-        
-        # 규제 분석 결과
-        st.header("📋 규제 분석")
-        if result["regulations"]:
-            for reg in result["regulations"]:
-                with st.expander(f"{reg.country} - {reg.regulation_name}"):
-                    st.write(f"**상태:** {reg.status}")
-                    st.write(f"**설명:** {reg.description}")
-                    if reg.effective_date:
-                        st.write(f"**시행일:** {reg.effective_date}")
-                    st.write(f"**주요 요구사항:**")
-                    for req in reg.key_requirements:
-                        st.write(f"- {req}")
-                    st.write(f"**출처:** [{reg.source_url}]({reg.source_url})")
-        else:
-            st.info("규제 분석 결과가 없습니다.")
-        
-        # 리스크 분석 결과
-        st.header("⚠️ 리스크 분석")
-        if result["risks"]:
-            # 우선순위별로 정렬
-            sorted_risks = sorted(result["risks"], key=lambda x: x.priority)
-            for risk in sorted_risks:
-                priority_color = {1: "🔴", 2: "🟡", 3: "🟢"}.get(risk.priority, "⚪")
-                with st.expander(f"{priority_color} {risk.country} - {risk.risk_category} (우선순위: {risk.priority})"):
-                    st.write(f"**리스크 수준:** {risk.risk_level}")
-                    st.write(f"**설명:** {risk.description}")
-                    st.write(f"**대응 전략:**")
-                    for strategy in risk.mitigation_strategies:
-                        st.write(f"- {strategy}")
-                    st.write(f"**준수 요구사항:**")
-                    for req in risk.compliance_requirements:
-                        st.write(f"- {req}")
-        else:
-            st.info("리스크 분석 결과가 없습니다.")
-        
-        # Q&A 섹션
-        st.header("❓ 질문하기")
-        
-        # Q&A 에이전트 초기화 (세션에 저장)
-        if "qa_agent" not in st.session_state:
-            st.session_state.qa_agent = QAAgent(model=model)
-        
-        # 질문 입력
-        user_question = st.text_input("질문을 입력하세요", placeholder="예: 이 규제가 신한은행에 미치는 영향은? 또는 이전 답변을 바탕으로 창의적인 아이디어를 제안해주세요", key="qa_question")
-        
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button("질문하기", key="qa_submit"):
-                if user_question.strip():
-                    with st.spinner("답변 생성 중..."):
-                        # Q&A 에이전트에 질문 전달 (규제/리스크 정보와 함께)
-                        answer = st.session_state.qa_agent.ask(user_question, result.get("regulations", []), result.get("risks", []))
-                        
-                        # 세션 상태에 질문과 답변 저장
-                        if "qa_history" not in st.session_state:
-                            st.session_state.qa_history = []
-                        st.session_state.qa_history.append({
-                            "question": user_question,
-                            "answer": answer,
-                            "timestamp": datetime.now().strftime("%H:%M:%S")
-                        })
-                        
-                        # 질문 입력 필드 초기화
-                        st.session_state.qa_question = ""
-                        st.rerun()
-                else:
-                    st.error("질문을 입력하세요.")
-        
-        with col2:
-            if st.button("질문 초기화", key="qa_clear"):
-                if "qa_history" in st.session_state:
-                    del st.session_state.qa_history
-                if "qa_agent" in st.session_state:
-                    del st.session_state.qa_agent
-                st.rerun()
-        
-        # 질문 히스토리 표시
-        if "qa_history" in st.session_state and st.session_state.qa_history:
-            st.subheader("💬 대화 기록")
-            for i, qa in enumerate(st.session_state.qa_history):
-                with st.expander(f"Q{i+1}: {qa['question'][:50]}... ({qa['timestamp']})", expanded=False):
-                    st.write(f"**질문:** {qa['question']}")
-                    st.write(f"**답변:** {qa['answer']}")
-                    st.write(f"*{qa['timestamp']}*")
+            # 분석 시작 플래그 설정
+            st.session_state.analysis_started = True
             
-            # 창의적 아이디어 요청 안내
-            st.info("💡 **팁**: 이전 답변을 바탕으로 '창의적인 아이디어를 제안해주세요', '추가 분석을 해주세요' 등의 질문을 해보세요!")
-        
-        # QA Agent 상태 표시
-        if "qa_agent" in st.session_state:
-            st.success("✅ QA Agent가 활성화되었습니다!")
-        else:
-            st.warning("⚠️ QA Agent를 초기화하는 중...")
+            # 처리 상태 설정
+            st.session_state.regulation_processing = True
+            
+            # 국가별 규제 비교 분석 실행
+            with st.spinner(f"{', '.join(selected_countries)}의 스테이블코인 규제를 검색하고 비교 분석하고 있습니다..."):
+                try:
+                    comparison_result = get_country_regulation_comparison(selected_countries)
+                    
+                    # 비교 분석 결과를 대화 기록에 추가
+                    st.session_state.regulation_chat_history.append({
+                        "role": "user", 
+                        "content": f"{', '.join(selected_countries)}의 스테이블코인 규제를 비교 분석해주세요"
+                    })
+                    st.session_state.regulation_chat_history.append({
+                        "role": "assistant", 
+                        "content": comparison_result
+                    })
+                    
+                    # 처리 완료
+                    st.session_state.regulation_processing = False
+                    st.rerun()
+                    
+                except Exception as e:
+                    error_msg = f"국가별 규제 비교 분석 중 오류가 발생했습니다: {str(e)}"
+                    st.error(error_msg)
+                    st.session_state.regulation_processing = False
     
-    else:
-        st.info("왼쪽 사이드바에서 검색 쿼리를 입력하고 '분석 실행' 버튼을 클릭하세요.")
+    # 채팅 UI (분석이 시작된 후에만 표시)
+    if st.session_state.analysis_started:
         
-        # 사용법 안내
-        st.header("📖 사용법")
-        st.write("""
-        1. **검색 쿼리**: 분석하고 싶은 규제 주제를 입력하세요 (예: stablecoin regulation)
-        2. **국가**: 특정 국가의 규제를 분석하려면 국가명을 입력하세요 (예: South Korea)
-        3. **시나리오 힌트**: 특정 비즈니스 상황을 고려한 분석을 원한다면 입력하세요
-        4. **AI 모델**: 사용할 OpenAI 모델을 선택하세요
-        5. **분석 실행**: 버튼을 클릭하여 전체 파이프라인을 실행하세요
-        """)
+        # 기존 대화 기록 표시
+        for message in st.session_state.regulation_chat_history:
+            if message["role"] == "user":
+                with st.chat_message("user"):
+                    st.write(message["content"])
+            else:
+                with st.chat_message("assistant"):
+                    st.write(message["content"])
+            
+        # 새로운 질문 입력 (처리 중이 아닐 때만)
+        if not st.session_state.regulation_processing:
+            if prompt := st.chat_input("규제 관련 질문을 입력하세요 (예: 미국의 스테이블코인 규제 현황은?)"):
+                # 중복 처리 방지
+                if prompt != st.session_state.regulation_last_prompt:
+                    st.session_state.regulation_last_prompt = prompt
+                    st.session_state.regulation_processing = True
+                        
+                    # 사용자 메시지 추가
+                    st.session_state.regulation_chat_history.append({"role": "user", "content": prompt})
+                    
+                    # AI 답변 생성
+                    with st.chat_message("assistant"):
+                        with st.spinner("규제 정보를 분석하고 있습니다..."):
+                            try:
+                                answer = get_regulation_analysis(prompt)
+                                st.write(answer)
+                                    
+                                # AI 답변을 대화 기록에 추가
+                                st.session_state.regulation_chat_history.append({"role": "assistant", "content": answer})
+                                
+                            except Exception as e:
+                                error_msg = f"오류가 발생했습니다: {str(e)}"
+                                st.error(error_msg)
+                                st.session_state.regulation_chat_history.append({"role": "assistant", "content": error_msg})
+                    
+                    # 처리 완료
+                    st.session_state.regulation_processing = False
+                    st.rerun()
         
-        st.header("🔧 환경변수 설정")
-        st.code("""
-# .env 파일에 다음을 추가하세요:
-TAVILY_API_KEY="your_tavily_api_key"
-OPENAI_API_KEY="your_openai_api_key"
-        """)
+        # 대화 초기화 버튼
+        if st.button("대화 초기화", key="regulation_clear", use_container_width=True):
+            st.session_state.regulation_chat_history = []
+            st.session_state.regulation_processing = False
+            st.session_state.regulation_last_prompt = ""
+            st.rerun()
+
+
+# 데모 UI (__main__ 실행 시)
+if __name__ == "__main__":
+    pass

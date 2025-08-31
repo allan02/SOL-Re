@@ -5,11 +5,11 @@ import os
 from datetime import datetime
 
 # utils 디렉토리를 Python 경로에 추가
-from utils import business_case_analysis
+from utils import regulation_analysis, business_case_analysis
 
 # 페이지 설정
 st.set_page_config(
-    page_title="본부 직원 - 신한금융그룹 스테이블코인 인텔리전스",
+    page_title="SSCI (본부부서용)",
     page_icon="",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -69,7 +69,8 @@ def headquarters_employee_main():
         menu_options = {
             "": "서비스를 선택하세요",
             "menu1": '📋 규제 분석',
-            "menu2": "📊 비즈니스 모니터링"
+            "menu2": "📊 비즈니스 모니터링",
+            "home": "🏠 홈으로 돌아가기",
         }
         
         selected_menu = st.selectbox(
@@ -80,11 +81,14 @@ def headquarters_employee_main():
         )
         
         if selected_menu:
-            st.session_state.menu_selected = selected_menu
+            if selected_menu == "home":
+                # 홈으로 돌아가기
+                st.switch_page("app.py")
+            else:
+                st.session_state.menu_selected = selected_menu
         else:
             # 빈 값이 선택되면 솔 캐릭터 화면으로 되돌아감
             st.session_state.menu_selected = None
-            st.success(f"현재 위치: 서비스 홈")
         
         # 솔 페이지 이미지 추가
         st.image("images/moli_page.jpg", use_container_width="always")
@@ -94,65 +98,12 @@ def headquarters_employee_main():
         if 'menu_selected' not in st.session_state:
             st.session_state.menu_selected = None
             
-        # 세션 상태 초기화
-        if 'regulation_chat_history' not in st.session_state:
-            st.session_state.regulation_chat_history = []
-            
         if st.session_state.menu_selected == "menu1":
-            # 규제 분석 인터페이스
+            # 규제 분석 인터페이스 - regulation_analysis.py의 함수 호출
             st.markdown("## 규제 분석")
             st.markdown("국가별 스테이블코인 규제 현황을 분석하고 리스크를 예측할 수 있습니다.")
-                    
-            # 주요 국가 리스트 (pycountry 사용)
-            major_countries = [
-                "United States", "European Union", "United Kingdom", "Japan", "South Korea", 
-                "China", "Singapore", "Switzerland", "Canada", "Australia", "Brazil", "India"
-            ]
             
-            # 국가 선택과 분석 실행 버튼을 가로로 배치
-            col1, col2 = st.columns([3, 1])
-            
-            with col1:
-                selected_countries = st.multiselect(
-                    "분석할 국가를 선택하세요 (2-3개 권장):",
-                    options=major_countries,
-                    default=["United States", "South Korea"],
-                    max_selections=3,
-                    help="💡 최대 3개 국가까지 선택 가능합니다.\n주요 금융 중심지 국가들을 선택하면 더 유용한 비교 분석을 얻을 수 있습니다!"
-                )
-            
-            with col2:
-                st.write("")  # 세로 정렬을 위한 여백
-                st.write("")  # 세로 정렬을 위한 여백
-                analyze_button = st.button("분석 실행", key="country_comparison", type="secondary")
-            
-            # 분석 실행 버튼 클릭 시 처리
-            if analyze_button:
-                if len(selected_countries) < 2:
-                    st.error("⚠️ 최소 2개 국가를 선택해주세요.")
-                elif len(selected_countries) > 3:
-                    st.error("⚠️ 최대 3개 국가까지만 선택 가능합니다.")
-                else:
-                    # 국가별 규제 비교 분석 실행
-                    with st.spinner(f"{', '.join(selected_countries)}의 스테이블코인 규제를 검색하고 비교 분석하고 있습니다..."):
-                        try:
-                            # regulation_analysis.py의 새로운 함수 호출
-                            from utils.regulation_analysis import get_country_regulation_comparison
-                            comparison_result = get_country_regulation_comparison(selected_countries)
-                            
-                            # 비교 분석 결과를 대화 기록에 추가
-                            st.session_state.regulation_chat_history.append({
-                                "role": "user", 
-                                "content": f"{', '.join(selected_countries)}의 스테이블코인 규제를 비교 분석해주세요"
-                            })
-                            st.session_state.regulation_chat_history.append({
-                                "role": "assistant", 
-                                "content": comparison_result
-                            })
-                            
-                        except Exception as e:
-                            error_msg = f"국가별 규제 비교 분석 중 오류가 발생했습니다: {str(e)}"
-                            st.error(error_msg)
+            regulation_analysis.show_country_regulation_analysis()
         
         elif st.session_state.menu_selected == "menu2":
             # Quick FAQ 인터페이스
@@ -160,10 +111,25 @@ def headquarters_employee_main():
             st.markdown("주요 금융사의 스테이블코인 전략과 잠재적 리스크를 분석합니다.")
             
             business_case_analysis.show_business_case_analysis()
+        else:
+            # 기본 이미지 표시
+            col_left, col_center, col_right = st.columns([1, 2, 1])
+            with col_center:
+                # 컨테이너를 사용하여 세로 중앙 정렬
+                container = st.container()
+                with container:
+                    # 이미지와 텍스트를 세로 중앙에 배치
+                    st.markdown("""
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 250px;">
+                        <div style="text-align: center;">
+                            <p>1. 왼쪽 사이드바에서 원하는 서비스를 선택하세요<br>2. 각 메뉴는 본부부서 업무에 필요한 기능을 제공합니다<br>3. 규제 분석, 비즈니스 모니터링 기능을 활용하세요</p>
+                        </div>
+                    </div>
+                    """.format(""), unsafe_allow_html=True)
 
     # 브랜드 푸터
     st.markdown('<div class="brand-footer">', unsafe_allow_html=True)
-    st.markdown('<p>© 2024 SHINHAN FINANCIAL GROUP. All Rights Reserved.</p>', unsafe_allow_html=True)
+    st.markdown('<p>© 2025 SHINHAN FINANCIAL GROUP. All Rights Reserved.</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":

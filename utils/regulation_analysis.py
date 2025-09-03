@@ -1,9 +1,16 @@
 import os
 import json
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TypedDict, Annotated
 from dataclasses import dataclass
 import streamlit as st
 from dotenv import load_dotenv
+
+# LangGraph imports
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.tools import tool
 
 # .env 파일 로드
 load_dotenv()
@@ -19,6 +26,31 @@ try:
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
+
+# Streamlit availability check
+try:
+    import streamlit as st
+    STREAMLIT_AVAILABLE = True
+except ImportError:
+    STREAMLIT_AVAILABLE = False
+
+# LangGraph State 정의
+class RegulationAnalysisState(TypedDict):
+    """규제 분석 워크플로우 상태"""
+    messages: Annotated[List, add_messages]
+    query: str
+    country: Optional[str]
+    scenario_hint: Optional[str]
+    search_results: List[Dict[str, Any]]
+    regulations: List[Dict[str, Any]]
+    risks: List[Dict[str, Any]]
+    qa_agent: Optional[Any]
+    final_answer: str
+    error_message: Optional[str]
+    comparison_countries: List[str]
+    comparison_result: str
+    current_step: str
+    analysis_type: str  # "single", "comparison", "qa"
 
 @dataclass
 class SearchItem:
@@ -49,6 +81,53 @@ class CountryRisk:
     priority: int  # 1-3 (1: highest)
     mitigation_strategies: List[str]
     compliance_requirements: List[str]
+
+# LangGraph Tools 정의
+@tool
+def web_search_tool(query: str, country: Optional[str] = None, max_results: int = 8) -> List[Dict[str, Any]]:
+    """웹 검색 도구 - Tavily API를 사용하여 스테이블코인 규제 관련 정보를 검색합니다."""
+    searcher = WebSearch()
+    results = searcher.search(query, country, max_results)
+    return [{
+        "title": item.title,
+        "url": item.url,
+        "snippet": item.snippet,
+        "published_date": item.published_date
+    } for item in results]
+
+@tool
+def regulation_analysis_tool(search_results: List[Dict[str, Any]], model: str = "gpt-4o-mini") -> List[Dict[str, Any]]:
+    """규제 분석 도구 - 검색 결과를 분석하여 규제 정보를 추출합니다."""
+    analyzer = RegulationAnalyzer(model=model)
+    # SearchItem 객체로 변환
+    search_items = [SearchItem(**item) for item in search_results]
+    regulations = analyzer.analyze(search_items)
+    return [{
+        "country": reg.country,
+        "regulation_name": reg.regulation_name,
+        "description": reg.description,
+        "effective_date": reg.effective_date,
+        "status": reg.status,
+        "key_requirements": reg.key_requirements,
+        "source_url": reg.source_url
+    } for reg in regulations]
+
+@tool
+def risk_prediction_tool(regulations: List[Dict[str, Any]], scenario_hint: Optional[str] = None, model: str = "gpt-4o-mini") -> List[Dict[str, Any]]:
+    """리스크 예측 도구 - 규제 정보를 바탕으로 리스크를 예측합니다."""
+    predictor = RiskPredictor(model=model)
+    # CountryRegulation 객체로 변환
+    reg_objects = [CountryRegulation(**reg) for reg in regulations]
+    risks = predictor.predict(reg_objects, scenario_hint)
+    return [{
+        "country": risk.country,
+        "risk_level": risk.risk_level,
+        "risk_category": risk.risk_category,
+        "description": risk.description,
+        "priority": risk.priority,
+        "mitigation_strategies": risk.mitigation_strategies,
+        "compliance_requirements": risk.compliance_requirements
+    } for risk in risks]
 
 class WebSearch:
     """Tavily 기반 웹 검색 클래스"""
@@ -1286,6 +1365,279 @@ def show_country_regulation_analysis():
             st.session_state.regulation_last_prompt = ""
             st.rerun()
 
+
+# LangGraph 노드 정의
+def search_node(state: RegulationAnalysisState) -> RegulationAnalysisState:
+    """웹 검색 노드"""
+    try:
+        query = state.get("query", "")
+        country = state.get("country")
+        
+        # 웹 검색 실행
+        search_results = web_search_tool.invoke({
+            "query": query,
+            "country": country,
+            "max_results": 8
+        })
+        
+        state["search_results"] = search_results
+        state["current_step"] = "search_completed"
+        state["messages"].append(AIMessage(content=f"웹 검색 완료: {len(search_results)}개 결과 발견"))
+        
+    except Exception as e:
+        state["error_message"] = f"웹 검색 오류: {str(e)}"
+        state["current_step"] = "error"
+    
+    return state
+
+def analysis_node(state: RegulationAnalysisState) -> RegulationAnalysisState:
+    """규제 분석 노드"""
+    try:
+        search_results = state.get("search_results", [])
+        
+        if not search_results:
+            state["error_message"] = "검색 결과가 없습니다."
+            state["current_step"] = "error"
+            return state
+        
+        # 규제 분석 실행
+        regulations = regulation_analysis_tool.invoke({
+            "search_results": search_results,
+            "model": "gpt-4o-mini"
+        })
+        
+        state["regulations"] = regulations
+        state["current_step"] = "analysis_completed"
+        state["messages"].append(AIMessage(content=f"규제 분석 완료: {len(regulations)}개 규제 발견"))
+        
+    except Exception as e:
+        state["error_message"] = f"규제 분석 오류: {str(e)}"
+        state["current_step"] = "error"
+    
+    return state
+
+def risk_prediction_node(state: RegulationAnalysisState) -> RegulationAnalysisState:
+    """리스크 예측 노드"""
+    try:
+        regulations = state.get("regulations", [])
+        scenario_hint = state.get("scenario_hint")
+        
+        if not regulations:
+            state["error_message"] = "분석할 규제가 없습니다."
+            state["current_step"] = "error"
+            return state
+        
+        # 리스크 예측 실행
+        risks = risk_prediction_tool.invoke({
+            "regulations": regulations,
+            "scenario_hint": scenario_hint,
+            "model": "gpt-4o-mini"
+        })
+        
+        state["risks"] = risks
+        state["current_step"] = "risk_prediction_completed"
+        state["messages"].append(AIMessage(content=f"리스크 예측 완료: {len(risks)}개 리스크 식별"))
+        
+    except Exception as e:
+        state["error_message"] = f"리스크 예측 오류: {str(e)}"
+        state["current_step"] = "error"
+    
+    return state
+
+def qa_node(state: RegulationAnalysisState) -> RegulationAnalysisState:
+    """Q&A 노드"""
+    try:
+        regulations = state.get("regulations", [])
+        risks = state.get("risks", [])
+        query = state.get("query", "")
+        
+        # Q&A 에이전트 초기화
+        qa_agent = QAAgent(model="gpt-4o-mini")
+        
+        # 질문에 대한 답변 생성
+        answer = qa_agent.ask(query, 
+                            [CountryRegulation(**reg) for reg in regulations],
+                            [CountryRisk(**risk) for risk in risks])
+        
+        state["qa_agent"] = qa_agent
+        state["final_answer"] = answer
+        state["current_step"] = "qa_completed"
+        state["messages"].append(AIMessage(content="Q&A 분석 완료"))
+        
+    except Exception as e:
+        state["error_message"] = f"Q&A 분석 오류: {str(e)}"
+        state["current_step"] = "error"
+    
+    return state
+
+def finalize_node(state: RegulationAnalysisState) -> RegulationAnalysisState:
+    """최종 결과 정리 노드"""
+    try:
+        regulations = state.get("regulations", [])
+        risks = state.get("risks", [])
+        final_answer = state.get("final_answer", "")
+        
+        # 최종 결과 구성
+        result = f"""# 📋 규제 분석 결과
+
+## 🔍 분석 요약
+- **규제 발견**: {len(regulations)}개
+- **리스크 식별**: {len(risks)}개
+
+## 📊 주요 규제
+"""
+        
+        for i, reg in enumerate(regulations[:3], 1):
+            result += f"### {i}. {reg.get('country', '알 수 없음')} - {reg.get('regulation_name', '규제명 없음')}\n"
+            result += f"{reg.get('description', '설명 없음')}\n\n"
+        
+        if risks:
+            result += "## ⚠️ 주요 리스크\n"
+            for i, risk in enumerate(risks[:3], 1):
+                priority_emoji = {1: "🔴", 2: "🟡", 3: "🟢"}.get(risk.get('priority', 3), "⚪")
+                result += f"### {priority_emoji} {i}. {risk.get('country', '알 수 없음')} - {risk.get('risk_category', '카테고리 없음')}\n"
+                result += f"{risk.get('description', '설명 없음')}\n\n"
+        
+        if final_answer:
+            result += f"## 💬 Q&A 답변\n{final_answer}\n"
+        
+        state["final_answer"] = result
+        state["current_step"] = "completed"
+        state["messages"].append(AIMessage(content="분석 완료"))
+        
+    except Exception as e:
+        state["error_message"] = f"최종 정리 오류: {str(e)}"
+        state["current_step"] = "error"
+    
+    return state
+
+# 에러 처리 노드
+def error_node(state: RegulationAnalysisState) -> RegulationAnalysisState:
+    """에러 처리 노드"""
+    error_msg = state.get("error_message", "알 수 없는 오류가 발생했습니다.")
+    state["final_answer"] = f"❌ 오류 발생: {error_msg}"
+    state["current_step"] = "error_completed"
+    state["messages"].append(AIMessage(content=f"오류 처리 완료: {error_msg}"))
+    return state
+
+# 조건부 라우팅 함수
+def should_continue(state: RegulationAnalysisState) -> str:
+    """다음 노드 결정"""
+    if state.get("error_message"):
+        return "error"
+    elif state.get("current_step") == "search_completed":
+        return "analysis"
+    elif state.get("current_step") == "analysis_completed":
+        return "risk_prediction"
+    elif state.get("current_step") == "risk_prediction_completed":
+        return "qa"
+    elif state.get("current_step") == "qa_completed":
+        return "finalize"
+    else:
+        return "error"
+
+# LangGraph 워크플로우 생성
+def create_regulation_analysis_graph() -> StateGraph:
+    """규제 분석 LangGraph 워크플로우를 생성합니다."""
+    
+    # 그래프 생성
+    workflow = StateGraph(RegulationAnalysisState)
+    
+    # 노드 추가
+    workflow.add_node("search", search_node)
+    workflow.add_node("analysis", analysis_node)
+    workflow.add_node("risk_prediction", risk_prediction_node)
+    workflow.add_node("qa", qa_node)
+    workflow.add_node("finalize", finalize_node)
+    workflow.add_node("error", error_node)
+    
+    # 엣지 추가 (조건부 라우팅)
+    workflow.set_entry_point("search")
+    workflow.add_conditional_edges(
+        "search",
+        should_continue,
+        {
+            "analysis": "analysis",
+            "error": "error"
+        }
+    )
+    workflow.add_conditional_edges(
+        "analysis",
+        should_continue,
+        {
+            "risk_prediction": "risk_prediction",
+            "error": "error"
+        }
+    )
+    workflow.add_conditional_edges(
+        "risk_prediction",
+        should_continue,
+        {
+            "qa": "qa",
+            "error": "error"
+        }
+    )
+    workflow.add_conditional_edges(
+        "qa",
+        should_continue,
+        {
+            "finalize": "finalize",
+            "error": "error"
+        }
+    )
+    workflow.add_edge("finalize", END)
+    workflow.add_edge("error", END)
+    
+    return workflow.compile()
+
+# LangGraph 기반 파이프라인 실행 함수
+def run_langgraph_pipeline(query: str, country: Optional[str] = None, scenario_hint: Optional[str] = None) -> Dict[str, Any]:
+    """LangGraph를 사용한 규제 분석 파이프라인 실행"""
+    try:
+        # 워크플로우 생성
+        graph = create_regulation_analysis_graph()
+        
+        # 초기 상태 설정
+        initial_state = {
+            "messages": [HumanMessage(content=query)],
+            "query": query,
+            "country": country,
+            "scenario_hint": scenario_hint,
+            "search_results": [],
+            "regulations": [],
+            "risks": [],
+            "qa_agent": None,
+            "final_answer": "",
+            "error_message": None,
+            "comparison_countries": [],
+            "comparison_result": "",
+            "current_step": "started",
+            "analysis_type": "single"
+        }
+        
+        # 워크플로우 실행
+        result = graph.invoke(initial_state)
+        
+        return {
+            "success": True,
+            "search_results": result.get("search_results", []),
+            "regulations": result.get("regulations", []),
+            "risks": result.get("risks", []),
+            "final_answer": result.get("final_answer", ""),
+            "error_message": result.get("error_message"),
+            "messages": result.get("messages", [])
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "error_message": f"LangGraph 파이프라인 오류: {str(e)}",
+            "search_results": [],
+            "regulations": [],
+            "risks": [],
+            "final_answer": "",
+            "messages": []
+        }
 
 # 데모 UI (__main__ 실행 시)
 if __name__ == "__main__":

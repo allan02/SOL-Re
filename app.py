@@ -125,7 +125,7 @@ def main():
         with col_logo:
             st.image("images/logo.png", width=200)
         with col_title:
-            st.markdown('<h2 class="main-header">Shinhan Stable Coin Intelligence Platform</h2>', unsafe_allow_html=True)
+            st.markdown('<h2 class="main-header">Shinhan Stable Coin Intelligence</h2>', unsafe_allow_html=True)
         with col_spacer:
             st.write("")  # 빈 공간
     

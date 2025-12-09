@@ -1,167 +1,295 @@
-# 🏦 신한은행 스테이블코인 인텔리전스
+# 신한은행 부동산 인텔리전스 (SOL-RE)
 
-신한은행 직원들을 위한 스테이블코인 정보 분석 및 상담 지원 시스템입니다.
+## 1. 프로젝트 개요
 
-## 📋 프로젝트 개요
+### 프로젝트 이름
+신한은행 부동산 인텔리전스 (SOL-RE)
 
-이 프로젝트는 신한은행 직원들이 스테이블코인 관련 정보를 쉽게 조회하고 분석할 수 있도록 도와주는 AI 기반 웹 애플리케이션입니다.
+### 결과물 형태
+웹앱 / 챗봇
 
-### 🎯 주요 기능
+### 한 줄 요약
+신한은행 직원을 위한 부동산 정책 Q&A 및 매물 검색 AI 챗봇 서비스
 
-#### 영업점 직원 서비스
-- **📚 스테이블코인 용어 백과사전**: RAG 기반 용어 검색 및 설명
-- **📰 뉴스 & QA**: 최신 스테이블코인 뉴스 조회 및 질의응답
+---
 
-#### 본부부서 직원 서비스
-- **🌍 규제 분석**: 국가별 스테이블코인 규제 동향 분석
-- **🏛️ 비즈니스 분석**: 메이저 금융사 현황 및 리스크 분석
+## 2. 프로젝트 목적
 
-## 🚀 시작하기
+### 업무 효율화
+신한은행 직원들이 부동산 정책 관련 질문과 매물 정보를 빠르고 정확하게 조회할 수 있도록 AI 기반 챗봇을 제공하여 업무 효율성을 향상시킵니다.
+
+### 문제 해결
+- 부동산 정책이 시시각각 변하는 상황에서 최신 정보를 빠르게 확인할 수 없는 문제 해결
+- 네이버 부동산에서 매물 정보를 수동으로 검색하는 불편함 해소
+- 캐시를 통한 날짜별 매물 가격 추이 비교 가능
+- 부동산 관련 질문에 대한 정확한 답변을 즉시 제공
+
+---
+
+## 3. 주요 기능
+
+### 1. RAG 기반 부동산 정책 Q&A
+부동산 정책 관련 질문에 대해 내부 지식베이스(realty_2025.md)를 벡터 DB로 구축하여 정확한 답변을 제공합니다. 내부 데이터에 없는 내용은 자동으로 인터넷 검색으로 보완합니다.
+
+### 2. 네이버 부동산 매물 자동 검색
+사용자의 자연어 질문을 분석하여 지역, 매물 유형, 거래 유형(매매/전세/월세)을 자동 추출하고, 네이버 부동산 사이트에서 관련 매물을 검색하여 구조화된 답변을 제공합니다.
+
+### 3. 검색 이력 자동 추적 및 표시
+사용자가 검색한 질문을 자동으로 캐시에 저장하고, 많이 검색한 순서로 정렬하여 표시합니다. 각 질문에 대한 가격 정보 요약과 검색 날짜를 함께 표시합니다.
+
+### 4. 지능형 답변 품질 검증
+내부 데이터 기반 답변의 충분성을 자동으로 검증하고, 부족하거나 추측성 답변이 생성된 경우 자동으로 웹 검색을 통해 보완합니다.
+
+### 5. 거래 유형별 구조화된 답변
+매매, 전세, 월세를 명확히 구분하여 각각의 가격 정보를 제공하고, 네이버 부동산 직접 링크를 포함하여 사용자가 추가 확인할 수 있도록 합니다.
+
+### 6. 원클릭 재검색 기능
+자주 검색한 질문을 사이드바에서 클릭하면 자동으로 검색창에 입력되고 검색이 실행되어 빠른 재조회가 가능합니다.
+
+---
+
+## 4. 사용 기술
+
+### LLM 모델
+- OpenAI GPT-3.5-turbo: 질의응답 및 답변 생성, 검색 파라미터 추출
+- OpenAI Embeddings: 텍스트 임베딩 생성
+
+### 적용 프레임워크
+- Streamlit: 웹 애플리케이션 프레임워크
+- LangChain: LLM 애플리케이션 개발 프레임워크
+  - RetrievalQA: RAG 기반 질의응답 체인
+  - FAISS: 벡터 데이터베이스
+  - RecursiveCharacterTextSplitter: 문서 청킹
+- Python 3.8+
+
+### 외부 API
+- Tavily Search API: 네이버 부동산 웹 검색
+
+### DB 또는 파일 저장 방식
+- FAISS: 벡터 데이터베이스 (메모리 기반, realty_2025.md 파일을 벡터화)
+- JSON 파일: 검색 이력 캐싱 (realty_search_cache.json)
+- Markdown 파일: 부동산 정책 지식베이스 (utils/realty_2025.md)
+
+### 기타 도구
+- dotenv: 환경 변수 관리
+
+---
+
+## 5. 사용자 흐름 (User Flow)
+
+### SOL - 부동산 Q&A 사용 흐름
+
+1. **웹 페이지 접속**
+   - 메인 페이지에서 신한금융그룹 로고와 "SOL-RE" 제목 확인
+   - "부동산 Q&A" 캐릭터(쏠) 선택하여 SOL 페이지로 이동
+
+2. **질문 입력**
+   - "15억 이상 주택 대출 얼마 나오나요?" 같은 부동산 정책 관련 질문을 검색창에 입력
+   - 검색 버튼 클릭
+
+3. **AI 처리**
+   - 질문이 내부 지식베이스(realty_2025.md)에 있는지 FAISS 벡터 DB를 통한 유사도 검색으로 확인
+   - 내부 데이터에 있으면: RAG 기반으로 관련 문서를 추출하여 GPT가 답변 생성
+   - 내부 데이터에 없거나 부족하면: Tavily API로 웹 검색 후 GPT가 검색 결과를 바탕으로 답변 생성
+
+4. **결과 표시**
+   - 내부 데이터 기반: 초록색 "내부 지식 데이터를 찾았습니다." 메시지와 함께 구조화된 답변 표시
+   - 웹 검색 보완: 경고색 "내부 지식 데이터가 부족합니다. 인터넷 검색으로 보완했습니다." 메시지와 함께 보완된 답변 표시
+
+### MOLI - 부동산 매물 검색 사용 흐름
+
+1. **웹 페이지 접속**
+   - 메인 페이지에서 "부동산 매물 검색" 캐릭터(몰리) 선택하여 MOLI 페이지로 이동
+
+2. **자주 검색하는 질문 확인 (선택사항)**
+   - 왼쪽 사이드바에서 최근 검색한 질문 5개 확인
+   - 각 질문 옆에 가격 요약(A1, A2 형식)과 검색 날짜 표시
+   - 원하는 질문 클릭 시 자동으로 검색 실행
+
+3. **매물 검색 질문 입력**
+   - "답십리 래미안 위브 전용 84 매매 매물 가격 알려줘" 같은 질문을 검색창에 입력
+   - 검색 버튼 클릭
+
+4. **AI 처리**
+   - GPT로 질문에서 지역, 매물 유형, 거래 유형(매매/전세/월세) 자동 추출
+   - Tavily API로 네이버 부동산 사이트 검색
+   - 검색 결과를 바탕으로 GPT가 매매/전세/월세를 구분하여 구조화된 답변 생성
+
+5. **결과 표시**
+   - 매매/전세/월세를 구분하여 가격 정보 제공
+   - 네이버 부동산 직접 링크 포함
+   - 검색 이력 자동 저장 (다음 검색 시 사이드바에 표시)
+
+---
+
+## 6. AI 활용 내역
+
+### 6.1 RAG 기반 지식베이스 구축 (FAISS 벡터 DB 활용)
+
+**FAISS 벡터 DB 사용 위치:**
+- `utils/dictionary.py`의 `_load_knowledge_base()` 함수
+- `realty_2025.md` 파일을 텍스트로 로드 → RecursiveCharacterTextSplitter로 청킹 → OpenAI Embeddings로 벡터화 → FAISS에 저장
+
+**FAISS 사용 코드:**
+```python
+# 텍스트 분할
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=500,
+    chunk_overlap=100,
+    separators=["\n\n", "\n", ". ", " ", ""]
+)
+splits = text_splitter.split_documents(documents)
+
+# FAISS 벡터 DB 생성
+self.vector_store = FAISS.from_documents(splits, self.embeddings)
+
+# 유사도 검색
+docs_with_scores = self.vector_store.similarity_search_with_score(question, k=5)
+```
+
+**프롬프트 예시:**
+
+```
+다음은 부동산 정책 백과사전에 대한 질문입니다.
+질문: {question}
+
+제공된 정보를 바탕으로 정확하고 이해하기 쉬운 답변을 제공해주세요.
+답변은 한국어로 작성하고, 필요시 예시를 포함해주세요.
+
+컨텍스트: {context}
+
+답변:
+```
+
+**구현 위치:** `utils/dictionary.py`
+
+**결과:**
+- "스트레스 DSR 3단계" 질문 시 FAISS가 realty_2025.md에서 가장 유사한 문서 청크를 검색하여 정확한 답변 추출
+- 유사도 점수(0.7 미만)를 기준으로 내부 데이터 충분성을 판단하여 웹 검색 필요 여부 결정
+- 내부 지식베이스 기반으로 신뢰할 수 있는 답변 제공
+
+---
+
+### 6.2 네이버 부동산 매물 검색 자동화
+
+**프롬프트 예시 (검색 파라미터 추출):**
+
+```
+다음 부동산 매물 검색 질문을 분석하여 정보를 추출해주세요.
+질문: {question}
+
+다음 형식으로 JSON으로만 응답해주세요:
+{
+    "region": "지역명 (예: 서울 강남구, 경기 성남시 등)",
+    "property_type": "매물 유형 (아파트, 빌라, 원룸, 투룸 등)",
+    "transaction_type": "거래 유형 (매매, 전세, 월세 중 하나 또는 여러 개)",
+    "price_range": "가격대 (있는 경우)",
+    "keywords": "추가 키워드 (단지명, 동호수, 전용면적 등)"
+}
+```
+
+**프롬프트 예시 (답변 생성):**
+
+```
+다음은 네이버 부동산 매물 검색 질문입니다.
+질문: {question}
+
+검색 파라미터:
+- 지역: {region}
+- 매물 유형: {property_type}
+- 거래 유형: {transaction_type}
+
+네이버 부동산 검색 결과:
+{search_results}
+
+위 정보를 바탕으로 다음을 포함하여 답변해주세요:
+
+1. 검색된 매물의 주요 정보 (지역, 매물 유형, 거래 유형별로 정리)
+2. 매매, 전세, 월세 각각의 매물 정보가 있다면 구분하여 제시
+3. 가격 정보가 있다면 포함
+4. 네이버 부동산 링크를 포함하여 사용자가 직접 확인할 수 있도록 안내
+
+**중요한 주의사항:**
+- 검색 결과의 가격 정보는 부정확하거나 오래된 정보일 수 있습니다. 절대적으로 신뢰하지 마세요.
+- 서울 아파트 매매 가격이 1억원대나 2억원대로 나오는 것은 명백히 비정상적입니다.
+- 검색 결과에 가격 정보가 있더라도, 반드시 네이버 부동산 링크를 통해 직접 확인하도록 강조해야 합니다.
+
+답변은 한국어로 작성하고, 명확하고 구조화된 형식으로 작성해주세요.
+```
+
+**구현 위치:** `utils/realty_search.py`
+
+**결과:**
+- "답십리 래미안 위브 전용 84 매매 매물 가격 알려줘" 질문 시
+- 네이버 부동산에서 관련 매물 검색 후 "매매 14억 8,000" 같은 가격 정보 제공
+- 매매/전세/월세를 명확히 구분하여 구조화된 답변 생성
+
+---
+
+### 6.3 검색 이력 자동 추적 및 표시
+
+**구현 위치:** `utils/realty_search.py`의 `record_realty_search` 함수
+
+**AI 활용:**
+- 정규식 패턴 매칭으로 답변에서 가격 정보 자동 추출
+- 검색 날짜 자동 기록 (YYYY.MM.DD 형식)
+- 많이 검색한 순서로 자동 정렬
+
+**결과:**
+- 사용자가 검색한 질문이 자동으로 캐시에 저장
+- 왼쪽 사이드바에 "Q1: 질문내용", "A1: 가격정보", "2025.12.09" 형식으로 표시
+- 클릭 시 자동으로 재검색 실행
+
+---
+
+## 7. 프로젝트 구조
+
+```
+langchain_chatbot_jh/
+├── app.py                    # 메인 페이지 (SOL/MOLI 선택)
+├── pages/
+│   ├── 1_sol.py              # SOL 페이지 (부동산 Q&A)
+│   └── 2_moli.py             # MOLI 페이지 (부동산 매물 검색)
+├── utils/
+│   ├── dictionary.py         # RAG 기반 부동산 정책 Q&A 모듈
+│   ├── realty_search.py      # 네이버 부동산 매물 검색 모듈
+│   └── realty_2025.md        # 부동산 정책 지식베이스
+├── images/                   # 캐릭터 이미지 및 로고
+├── requirements.txt          # Python 의존성
+├── realty_search_cache.json  # 검색 이력 캐시 (자동 생성)
+└── README.md                 # 프로젝트 문서
+```
+
+---
+
+## 8. 설치 및 실행
 
 ### 1. 환경 설정
 
 ```bash
-# 프로젝트 클론
-git clone <repository-url>
-cd shinhan-stable-coin-intelligence
-
-# 가상환경 생성 및 활성화
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
 # 의존성 설치
 pip install -r requirements.txt
 ```
 
 ### 2. 환경 변수 설정
 
-`.env` 파일을 생성하고 다음 API 키들을 설정하세요:
+`.env` 파일을 생성하고 다음을 설정:
 
-```env
-# 필수: OpenAI API 키
-OPENAI_API_KEY=your_openai_api_key_here
-
-# 선택: Tavily Search API 키 (뉴스 검색용)
-TAVILY_API_KEY=your_tavily_api_key_here
-
-# 선택: Google Custom Search API (용어 백과사전 인터넷 검색 보완용)
-SEARCH_API_KEY=your_google_search_api_key_here
-SEARCH_ENGINE_ID=your_custom_search_engine_id_here
 ```
-
-#### Google Custom Search API 설정 방법 (선택사항)
-
-용어 백과사전에서 백과사전에 없는 내용을 인터넷 검색으로 보완하려면:
-
-1. **API 키 발급**: [Google Cloud Console](https://console.cloud.google.com/)에서 Custom Search API 활성화
-2. **검색 엔진 생성**: [Google Custom Search Engine](https://cse.google.com/)에서 검색 엔진 생성
-3. **환경 변수 설정**: 위에서 발급받은 키들을 `.env` 파일에 입력
-
-API 키가 설정되지 않은 경우, 백과사전에 없는 내용에 대해서는 시뮬레이션된 검색 결과를 제공합니다.
+OPENAI_API_KEY=your_openai_api_key
+TAVILY_API_KEY=your_tavily_api_key
+```
 
 ### 3. 애플리케이션 실행
 
 ```bash
-streamlit run main.py
+streamlit run app.py
 ```
 
-브라우저에서 `http://localhost:8501`로 접속하여 애플리케이션을 사용할 수 있습니다.
+브라우저에서 `http://localhost:8501`로 접속
 
-## 🏗️ 프로젝트 구조
+---
 
-```
-shinhan-stable-coin-intelligence/
-├── main.py                          # 메인 Streamlit 앱
-├── requirements.txt                 # Python 의존성
-├── README.md                       # 프로젝트 문서
-├── pages/                          # 페이지 모듈
-│   ├── __init__.py
-│   ├── branch_employee.py          # 영업점 직원 페이지
-│   └── headquarters_employee.py    # 본부부서 직원 페이지
-└── utils/                          # 유틸리티 모듈
-    ├── __init__.py
-    ├── dictionary.py               # 용어 백과사전 RAG (stablecoin_book_2025_full.md 기반)
-    ├── simple_news_analysis.py     # 뉴스 분석
-    ├── regulation_analysis.py      # 규제 분석
-    ├── business_case_analysis.py   # 비즈니스 분석
-    └── stablecoin_book_2025_full.md # 스테이블코인 용어 백과사전 마크다운
-```
-
-## 🔧 기술 스택
-
-- **Frontend**: Streamlit
-- **AI/ML**: LangChain, LangGraph
-- **LLM**: OpenAI GPT-3.5-turbo
-- **Vector Database**: FAISS
-- **Search**: Tavily Search API, Google Custom Search API (선택사항)
-- **Knowledge Base**: Markdown 기반 RAG 시스템
-- **Language**: Python 3.8+
-
-## 📚 사용법
-
-### 영업점 직원
-
-1. 사이드바에서 "🏪 영업점 직원" 선택
-2. **용어 백과사전** 탭에서 스테이블코인 관련 용어 검색
-   - `stablecoin_book_2025_full.md` 기반의 포괄적인 용어 데이터베이스
-   - 백과사전에 없는 내용은 자동으로 인터넷 검색으로 보완
-   - 유사한 용어 자동 추천 기능
-3. **뉴스 & QA** 탭에서 최신 뉴스 기반 질의응답
-
-### 본부부서 직원
-
-1. 사이드바에서 "🏢 본부부서 직원" 선택
-2. **규제 분석** 탭에서 국가별 규제 동향 분석
-3. **비즈니스 분석** 탭에서 경쟁사 현황 및 리스크 분석
-
-## 🤝 협업 가이드
-
-### Git 워크플로우
-
-1. **브랜치 생성**: `git checkout -b feature/your-feature-name`
-2. **변경사항 커밋**: `git commit -m "feat: add new feature"`
-3. **푸시**: `git push origin feature/your-feature-name`
-4. **Pull Request 생성**: GitHub에서 PR 생성
-
-### 코드 컨벤션
-
-- **함수명**: snake_case 사용
-- **클래스명**: PascalCase 사용
-- **상수**: UPPER_SNAKE_CASE 사용
-- **주석**: 한국어로 작성
-
-### 커밋 메시지 형식
-
-```
-type: description
-
-feat: 새로운 기능 추가
-fix: 버그 수정
-docs: 문서 수정
-style: 코드 포맷팅
-refactor: 코드 리팩토링
-test: 테스트 추가
-chore: 빌드 프로세스 또는 보조 도구 변경
-```
-
-## 🔒 보안
-
-- API 키는 `.env` 파일에 저장하고 절대 Git에 커밋하지 마세요
-- `.env` 파일은 `.gitignore`에 포함되어 있습니다
-- 프로덕션 환경에서는 환경 변수를 안전하게 관리하세요
-
-## 📝 라이선스
+## 9. 라이선스
 
 이 프로젝트는 신한은행 내부 사용을 위한 프로젝트입니다.
-
-## 🆘 문제 해결
-
-### 일반적인 문제
-
-1. **API 키 오류**: `.env` 파일이 올바르게 설정되었는지 확인
-2. **의존성 오류**: `pip install -r requirements.txt` 재실행
-3. **포트 충돌**: 다른 Streamlit 앱이 실행 중인지 확인
-
-### 지원
-
-문제가 발생하면 이슈를 생성하거나 개발팀에 문의하세요.

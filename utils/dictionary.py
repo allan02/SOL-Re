@@ -18,7 +18,7 @@ load_dotenv()
 class StablecoinDictionary:
     """
     스테이블코인 용어 백과사전 RAG 시스템
-    stablecoin_book_2025_full.md 파일 기반으로 vector db를 구축하고 사용자 질문에 답변
+    realty_2025.md 파일 기반으로 vector db를 구축하고 사용자 질문에 답변
     백과사전에 없는 내용은 인터넷 검색으로 보완
     """
     
@@ -34,9 +34,9 @@ class StablecoinDictionary:
         self._initialize_knowledge_base()
     
     def _load_markdown_content(self) -> List[Document]:
-        """stablecoin_book_2025_full.md 파일을 구조화된 문서로 로드"""
+        """realty_2025.md 파일을 구조화된 문서로 로드"""
         try:
-            file_path = os.path.join(os.path.dirname(__file__), "stablecoin_book_2025_full.md")
+            file_path = os.path.join(os.path.dirname(__file__), "realty_2025.md")
             with open(file_path, 'r', encoding='utf-8') as file:
                 content = file.read()
             
@@ -53,7 +53,7 @@ class StablecoinDictionary:
                         documents.append(Document(
                             page_content=section.strip(),
                             metadata={
-                                "source": "stablecoin_book_2025_full.md",
+                                "source": "realty_2025.md",
                                 "section": "title",
                                 "title": title,
                                 "section_index": i
@@ -76,7 +76,7 @@ class StablecoinDictionary:
                                     documents.append(Document(
                                         page_content=f"섹션: {section_title}\n용어: {term_data['term']}\n정의: {term_data['definition']}\n예시: {term_data['examples']}",
                                         metadata={
-                                            "source": "stablecoin_book_2025_full.md",
+                                            "source": "realty_2025.md",
                                             "section": section_title,
                                             "term": term_data['term'],
                                             "section_index": i,
@@ -88,7 +88,7 @@ class StablecoinDictionary:
                                 documents.append(Document(
                                     page_content=f"섹션: {section_title}\n내용: {section_content}",
                                     metadata={
-                                        "source": "stablecoin_book_2025_full.md",
+                                        "source": "realty_2025.md",
                                         "section": section_title,
                                         "section_index": i,
                                         "term_type": "section_content"
@@ -333,12 +333,24 @@ class StablecoinDictionary:
             "모르겠습니다", "찾을 수 없습니다", "정보가 부족합니다",
             "알 수 없습니다", "확실하지 않습니다",
             "제공된 정보에는", "제공받은 정보에는", "포함되어 있지 않습니다",
-            "해당 정보를 제공할 수 없습니다"
+            "해당 정보를 제공할 수 없습니다", "예측 가능합니다", "예상됩니다",
+            "고려할 때", "추세를 고려", "방향을 예상"
         ]
         
         for phrase in low_confidence_phrases:
             if phrase in answer:
                 return False
+        
+        # 질문에 "예측", "미래", "앞으로" 같은 단어가 있고 답변에 구체적 정보가 없으면 False
+        future_keywords = ["예측", "미래", "앞으로", "향후", "2026", "2027", "내년"]
+        if any(keyword in question for keyword in future_keywords):
+            # 미래 관련 질문인데 답변이 추측성 표현만 있으면 KB에 없다고 판단
+            speculation_phrases = ["예상됩니다", "예측 가능합니다", "고려할 때", "추세를 고려"]
+            if any(phrase in answer for phrase in speculation_phrases):
+                # 구체적인 숫자나 사실이 있는지 확인
+                has_concrete_info = any(char.isdigit() for char in answer) or "2025" in answer
+                if not has_concrete_info:
+                    return False
         
         return True
     
@@ -348,22 +360,24 @@ class StablecoinDictionary:
             if not self.vector_store:
                 return False
             
-            # 빠른 검색으로 관련 문서 확인 (k=2로 줄여서 속도 향상)
-            docs = self.vector_store.similarity_search(question, k=2)
+            # 유사도 점수와 함께 검색 (유사도가 높은 문서만 KB에 있다고 판단)
+            docs_with_scores = self.vector_store.similarity_search_with_score(question, k=5)
             
-            # 검색된 문서의 메타데이터 확인
-            for doc in docs:
+            # 검색된 문서의 메타데이터와 유사도 점수 확인
+            for doc, score in docs_with_scores:
                 metadata = doc.metadata
-                # stablecoin_book_2025_full.md에서 온 문서인지 확인
-                if (metadata.get('source') == 'stablecoin_book_2025_full.md' and 
-                    metadata.get('term') and 
-                    len(doc.page_content) > 100):  # 충분한 내용이 있는 문서
+                # realty_2025.md에서 온 문서이고 유사도가 충분히 높은 경우만 True
+                # FAISS의 유사도 점수는 거리이므로 낮을수록 유사함 (일반적으로 0.5 이하가 유사)
+                if (metadata.get('source') == 'realty_2025.md' and 
+                    len(doc.page_content) > 50 and
+                    score < 0.7):  # 유사도 점수가 0.7 미만이면 관련 있다고 판단
                     return True
             
             return False
             
         except Exception as e:
             print(f"지식베이스 확인 중 오류: {e}")
+            # 오류 발생 시 보수적으로 False 반환 (웹 검색으로 전환)
             return False
     
     def get_fast_answer(self, question: str) -> str:
@@ -402,7 +416,17 @@ class StablecoinDictionary:
     
     def get_answer(self, question: str) -> str:
         """사용자 질문에 대한 답변 생성"""
+        answer, _ = self.get_answer_with_info(question)
+        return answer
+    
+    def get_answer_with_info(self, question: str) -> tuple[str, bool]:
+        """사용자 질문에 대한 답변 생성 및 웹 검색 사용 여부 반환
+        
+        Returns:
+            tuple: (답변 문자열, 웹 검색 사용 여부)
+        """
         start_time = time.time()
+        used_web_search = False
         
         try:
             # 먼저 지식베이스에 있는 내용인지 빠르게 확인
@@ -410,6 +434,7 @@ class StablecoinDictionary:
             
             if not is_in_kb:
                 # KB에 없으면 즉시 웹 검색 경로로 전환
+                used_web_search = True
                 internet_result = self._search_internet(question)
                 enhanced_prompt = f"""
                 다음 질문에 대해 답변해주세요:
@@ -424,8 +449,8 @@ class StablecoinDictionary:
                 """
                 enhanced_result = self.qa_chain({"query": enhanced_prompt})
                 response_time = time.time() - start_time
-                st.info(f"인터넷 검색 기반 답변 완료 (응답시간: {response_time:.2f}초)")
-                return enhanced_result['result']
+                print(f"인터넷 검색 기반 답변 완료 (응답시간: {response_time:.2f}초)")
+                return enhanced_result['result'], used_web_search
             
             # 프롬프트 템플릿 (KB에 있는 경우)
             prompt = f"""
@@ -445,10 +470,11 @@ class StablecoinDictionary:
             # 지식베이스에서 충분한 정보를 얻었는지 확인
             if self._check_knowledge_coverage(question, answer):
                 response_time = time.time() - start_time
-                st.info(f"내부 지식 데이터 기반 답변 완료 (응답시간: {response_time:.2f}초)")
-                return answer
+                print(f"내부 지식 데이터 기반 답변 완료 (응답시간: {response_time:.2f}초)")
+                return answer, used_web_search
             else:
                 # 인터넷 검색으로 보완
+                used_web_search = True
                 internet_result = self._search_internet(question)
                 enhanced_prompt = f"""
                 다음 질문에 대해 답변해주세요:
@@ -463,13 +489,13 @@ class StablecoinDictionary:
                 """
                 enhanced_result = self.qa_chain({"query": enhanced_prompt})
                 response_time = time.time() - start_time
-                st.info(f"인터넷 검색 보완 답변 완료 (응답시간: {response_time:.2f}초)")
-                return enhanced_result["result"]
+                print(f"인터넷 검색 보완 답변 완료 (응답시간: {response_time:.2f}초)")
+                return enhanced_result["result"], used_web_search
             
         except Exception as e:
             response_time = time.time() - start_time
             print(f"❌ 답변 생성 오류 (응답시간: {response_time:.2f}초)")
-            return f"답변 생성 중 오류가 발생했습니다: {str(e)}"
+            return f"답변 생성 중 오류가 발생했습니다: {str(e)}", used_web_search
     
     def get_similar_terms(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
         """유사한 용어 검색"""
@@ -615,6 +641,19 @@ def get_dictionary_answer(question: str) -> str:
     
     return _dictionary_instance.get_answer(question)
 
+def get_dictionary_answer_with_info(question: str) -> tuple[str, bool]:
+    """스테이블코인 용어 백과사전에서 답변과 웹 검색 사용 여부를 가져오는 함수
+    
+    Returns:
+        tuple: (답변 문자열, 웹 검색 사용 여부)
+    """
+    global _dictionary_instance
+    
+    if _dictionary_instance is None:
+        _dictionary_instance = StablecoinDictionary()
+    
+    return _dictionary_instance.get_answer_with_info(question)
+
 def get_fast_dictionary_answer(question: str) -> str:
     """스테이블코인 용어 백과사전에서 빠른 답변을 가져오는 함수 (DB에 있는 내용인 경우)"""
     global _dictionary_instance
@@ -661,7 +700,7 @@ def get_all_categories() -> List[str]:
     return _dictionary_instance.get_all_categories()
 
 def is_question_in_kb(question: str) -> bool:
-    """질문이 KB(stablecoin_book_2025_full.md) 범위인지 공개 함수로 제공"""
+    """질문이 KB(realty_2025.md) 범위인지 공개 함수로 제공"""
     global _dictionary_instance
     if _dictionary_instance is None:
         _dictionary_instance = StablecoinDictionary()

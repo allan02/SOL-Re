@@ -1,8 +1,12 @@
 import streamlit as st
+from dotenv import load_dotenv
+
+# 환경 변수 로드
+load_dotenv()
 
 # 페이지 설정
 st.set_page_config(
-    page_title="신한금융그룹 스테이블코인 인텔리전스",
+    page_title="신한은행 부동산 인텔리전스",
     page_icon="",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -125,7 +129,7 @@ def main():
         with col_logo:
             st.image("images/logo.png", width=200)
         with col_title:
-            st.markdown('<h2 class="main-header">Shinhan Stable Coin Intelligence</h2>', unsafe_allow_html=True)
+            st.markdown('<h2 class="main-header">SOL-RE</h2>', unsafe_allow_html=True)
         with col_spacer:
             st.write("")  # 빈 공간
     
@@ -148,8 +152,8 @@ def main():
         </div>
         """.format(get_image_base64("images/sol.png")), unsafe_allow_html=True)
         
-        st.markdown('<h3 class="character-title">🏪 영업점</h3>', unsafe_allow_html=True)
-        st.markdown('<p class="character-description">북극성의 여행 작가 쏠처럼,<br>영업점에서 고객과 함께하는 특별한 여행을 시작해보세요</p>', unsafe_allow_html=True)
+        st.markdown('<h3 class="character-title">부동산 Q&A</h3>', unsafe_allow_html=True)
+        st.markdown('<p class="character-description">쏠에게 부동산 관련된 무엇이든 물어봐요</p>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     with col2:
@@ -163,8 +167,8 @@ def main():
         </div>
         """.format(get_image_base64("images/moli.png")), unsafe_allow_html=True)
         
-        st.markdown('<h3 class="character-title">🏢 본부부서</h3>', unsafe_allow_html=True)
-        st.markdown('<p class="character-description">식물 카페의 느긋한 사장님 몰리처럼,<br>본부에서 차분하게 전략을 세워보세요</p>', unsafe_allow_html=True)
+        st.markdown('<h3 class="character-title">부동산 매물 검색</h3>', unsafe_allow_html=True)
+        st.markdown('<p class="character-description">몰리와 함께 다양한 부동산 매물들을 찾아봐요</p>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
     
     # 브랜드 푸터
@@ -180,9 +184,9 @@ def main():
     if "page" in query_params:
         page = query_params["page"]
         if page == "branch_employee":
-            st.switch_page("pages/branch_employee.py")
+            st.switch_page("pages/1_sol.py")
         elif page == "headquarters_employee":
-            st.switch_page("pages/headquarters_employee.py")
+            st.switch_page("pages/2_moli.py")
 
 def get_image_base64(image_path):
     """이미지를 base64로 인코딩하는 함수"""
